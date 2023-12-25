@@ -11,13 +11,12 @@ URL: https://apicarto.ign.fr/api/codes-postaux/communes
 Lancement sur streamlit : 
 streamlit run indexB004_DataGouv.py
 
-Prochaine étape : afficher la liste des communes dans une DF par exemple
-
 Date : 22-12-23
 """
 
 import requests
 import json
+import pandas as pd
 import streamlit as st
 import pprint
 
@@ -65,13 +64,33 @@ class FrontEnd():
 
             # Liste des communes
             city_list = [i['nomCommune'] for i in data]
-            print(f"Communes avec le code postal suivant : {self.code_postal}")
-            print(city_list)
+            
+            # Conversion en df pandas
+            city_df = pd.DataFrame({"Commune(s)": city_list})
+            
+            # Titre à afficher
+            st.write(f"Communes avec le code postal suivant : {self.code_postal}")
+            
+            # DF à afficher
+            st.data_editor(
+                city_df,
+                column_config={
+                    "widgets": st.column_config.Column(
+                        "Commune(s)",
+                        width="medium",
+                        required=True,
+                    )
+                },
+                hide_index=True, # index masqué
+                num_rows="dynamic",
+            )
         
         # À défaut (code http : 404) 
         else:
             
-            print(f'Communes non retrouvée pour le code postal : {self.code_postal}')
+            st.warning(
+                f'Communes non retrouvée pour le code postal : {self.code_postal}',
+                icon="⚠️")
 
 if __name__ == '__main__':
     
