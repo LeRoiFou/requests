@@ -13,8 +13,7 @@ URL: https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/controle_te
 Lancement sur streamlit : 
 streamlit run indexB005_DataGouv.py
 
-Prochain travail : récupérer les départements de la liste de dictionnaires
-avec le fichier jupyter labo
+Prochain travail : présentation des données sous streamlit
 
 Date : 25-12-23
 """
@@ -22,20 +21,24 @@ Date : 25-12-23
 import requests
 import json
 import streamlit as st
-import pprint
+import polars as pl
 
-"Liste des départements"
+"Variables à saisir"
+code_postal = input("Code postal : ")
+limit = int(input("Nombre max d'affichage : "))
 
-# URL pour la liste des départements
-url = 'https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/controle_techn/records?group_by=cct_code_dept'
+# Accès à l'URL avec le requêtage appliqué : 
+url = f"https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/controle_techn/records?where=code_postal%3D%27{code_postal}%27&group_by=cct_denomination%20AS%20nom%2C%20cct_adresse%20AS%20adresse%2C%20code_postal%2C%20cct_code_commune%20AS%20commune%2C%20prix_visite%2C%20prix_contre_visite_min%2C%20prix_contre_visite_max&order_by=prix_visite&limit={limit}"
 
-# Récupération de l'URL pour requêtage
-dept_response = requests.get(url)
+# Requête url
+response = requests.get(url)
+
+# Code statut html
+response.status_code
 
 # Récupération du contenu au format json
-dept_data = json.loads(dept_response.content)
+data = json.loads(response.content)
 
-# pprint.pprint(dept_data['results'])
-
-print(dept_data['results'])
-
+# Affichage des données
+df = pl.DataFrame(data['results'])
+print(df)
