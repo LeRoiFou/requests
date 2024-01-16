@@ -1,28 +1,11 @@
 """
-Configuration de la page @ :
-
-Recours à la librairie Dash
-
-Un titre principal
-
-1 colonne comprenant 2 menus déroulants :
--> un pour le type d'indépendant
--> un pour le ou les départements
-
-1 colonne comprenant 2 graphiques :
--> Graphique sur le nombre d'indépendants (diagramme en barres) :
-    . Axe des X : années
-    . Axe des y : le nombre d'indépendants par département(s)
-
--> Graphique sur les revenus des indépendants (diagramme linéaire) :
-    . Axe des X : années
-    . Axe des y : les revenus des indépendants par département(s)
+Configuration de la page @ : recours à la librairie Dash
     
 Date : 13-01-24
 Éditeur : Laurent Reynaud
 """
 
-from dash import Dash, html, dcc, callback, Input, Output, exceptions
+from dash import Dash, html, dcc, callback, Input, State, Output, exceptions
 import dash_bootstrap_components as dbc
 import requests
 import json
@@ -40,8 +23,13 @@ departments = [department for department_list in departments_list
 
 # CONFIGURATION DES COMPOSANTS -----------------------------------------
 
-# Menus déroulants
+# Titre, menus déroulants et message d'information
 dropdown_card = dbc.Card([
+    
+    # Titre principal de la page @
+    html.H4("Travailleurs indépendants depuis 2013", # Texte affiché
+            className='main-title', # Voir fichier .css
+            ),
     
     # Menu déroulant pour le type d'indépendant
     dcc.Dropdown(
@@ -64,16 +52,52 @@ dropdown_card = dbc.Card([
         className='dropdown-independent', # Config fichier .css
     ),
     
+    # Bouton d'information
+    dbc.Button("Information", # Titre
+                id="info-popover", # callback
+                className='button-info', # Fichier .css
+                ),
+    
+    # Texte d'information
+    dbc.Popover(
+        [
+        # En-tête du commentaire
+        dbc.PopoverHeader("Urssaf, données arrêtées en mai 2023"),
+        
+        # Corps principal du commentaire
+        dbc.PopoverBody(
+            "Ces données n’intègrent pas les exploitants agricoles. Pour l’exercice professionnel de son activité économique, le travailleur indépendant (TI) peut opter pour le statut dit « classique » ou celui d’auto-entrepreneur (AE)."),
+        
+        # Corps principal du commentaire (suite)
+        dbc.PopoverBody(
+            "Le revenu des AE est calculé à partir du chiffre d'affaires déclaré."),
+        
+        # Corps principal du commentaire (suite)
+        dbc.PopoverBody(
+            "Le nombre de travailleurs indépendants comptabilise des comptes de cotisants et non des individus et ayant dégagé un revenu."),
+        ],
+        id="popover", # pour le callback
+        target="info-popover",  # pour le callback avec le bouton d'information
+        placement="bottom", # commentaire placé de préférence en dessous du bouton
+        is_open=False, # si True : commentaire toujours affiché
+    ),
+    
 ], className='dropdowns-card') # Config fichier .css
 
 # Diagrammes
 graph_card = dbc.Card([
     
-    # Graphique vide pour le nombre d'indépendants (diagramme en barres)
-    dcc.Graph(id='graph-numbers'), # pour le callback
+    # Zone vide pour le nombre d'indépendants (diagramme en barres)
+    html.Div(id='graph-numbers', # pour le callback
+             children=[] # Zone vide
+             ), 
     
-    # Graphique vide pour les revenus des indépendants (diagramme linéaire)
-    dcc.Graph(id='graph-revenues'), # pour le callback
+    html.Br(),
+    
+    # Zone vide pour les revenus des indépendants (diagramme linéaire)
+    html.Div(id='graph-revenues', # pour le callback
+             children=[] # Zone vide
+             ), 
     
 ], className='graphs-card') # Config fichier .css
 
@@ -85,11 +109,6 @@ app = Dash(external_stylesheets=[dbc.themes.DARKLY])
 
 # Configuration de la page @
 app.layout = html.Div(children=[
-    
-    # Titre principal de la page @
-    html.H3("Travailleurs indépendants depuis 2013", # Texte affiché
-            className='main-title', # Voir fichier .css
-            ),
     
     dbc.Row([
         
@@ -111,11 +130,11 @@ app.layout = html.Div(children=[
 @callback(
     [Output(
         component_id='graph-numbers', # Sortie : diagramme en barres (nbre indép.)
-        component_property='figure' # Fonctionnalité : figure du graph
+        component_property='children' # Fonctionnalité : valeur de la zone vide
         ),
      Output(
          component_id='graph-revenues', # Sortie : diagramme linéaire (rev indép.)
-         component_property='figure' # Fonctionnalité : figure du graph
+         component_property='children' # Fonctionnalité : valeur de la zone vide
          )],
    [ Input(
        component_id='type', # Entrée : menu déroulant type d'indépendant
@@ -151,28 +170,59 @@ def update_graph(type_seleted, departments_selected):
         
         # Configuration du diagramme en barres (nombre d'indépendants)
         graph_numbers = px.bar(
-            data_frame=df_ti,
-            x='annee',
-            y="nombre_de_ti",
-            height=350,
+            data_frame=df_ti, # Récupération de la DF
+            title="Nombre d'indépendants",
+            x='annee', # Axe des abscisses
+            y="nombre_de_ti", # Axe des ordonnées
+            height=350, # Hauteur
+            text_auto='.3s', # Montants à 3 chiffres mentionnés sur les barres
+            color_discrete_sequence=['#4292c6'], # Couleur des barres
+        ).update_traces(
+            textfont_size=12, # Taille des caractères à l'intérieur du graph
+            textposition="inside", # Texte en dehors / intérieur des barres
+        ).update_layout(
+            xaxis_title='', # Modification du nom de l'axe x
+            yaxis_title='', # Modification du nom de l'axe y
         )
           
         # Configuration du diagramme linéaire (revenus des indépendants)
         graph_revenues = px.line(
-            data_frame=df_revenues,
-            x='annee',
-            y="revenu",
-            height=350,
+            data_frame=df_revenues, # Récupération de la DF
+            title="Revenus totaux",
+            x='annee', # Axe des abscisses
+            y="revenu", # Axe des ordonnées
+            height=350, # Hauteur
+            color_discrete_sequence=['#4292c6'], # Couleur de la ligne
+        ).update_traces(
+            textfont_size=12, # Taille des caractères à l'intérieur du graph
+            mode="markers+lines", # marqueur sur la ligne
+        ).update_layout(
+            xaxis_title='', # Modification du nom de l'axe x
+            yaxis_title='', # Modification du nom de l'axe y
         )
         
         # MAJ des graphiques
-        return graph_numbers, graph_revenues
+        return dcc.Graph(figure=graph_numbers), dcc.Graph(figure=graph_revenues)
     
     # Si dans l'un des menus déroulants, aucune valeur n'est affichée   
     else:
         
         # Exception : pas de MAJ des graphiques
         raise exceptions.PreventUpdate
+    
+# Affichage d'un commentaire en cliquant sur le bouton "Information"
+@callback(
+    Output("popover", "is_open"), # Sortie : commentaire
+    [Input("info-popover", "n_clicks")], # Entrée : Bouton d'information
+    [State("popover", "is_open")], # State : commentaire
+)
+def toggle_popover(n, is_open):
+    
+    # Evite l'affichage automatique du commentaire dès ouverture de la page @
+    if n:
+        return not is_open
+    
+    return is_open
 
 if __name__ == '__main__':
     app.run_server(debug=True)
