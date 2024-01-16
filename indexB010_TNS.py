@@ -22,11 +22,12 @@ Date : 13-01-24
 Éditeur : Laurent Reynaud
 """
 
-from dash import Dash, html, dcc, callback, Input, Output
+from dash import Dash, html, dcc, callback, Input, Output, exceptions
 import dash_bootstrap_components as dbc
 import requests
 import json
 import polars as pl
+import plotly.express as px
 
 # BACK END --------------------------------------------------------------
 
@@ -46,22 +47,23 @@ dropdown_card = dbc.Card([
     dcc.Dropdown(
         id='type', # pour le callback
         options=[ # valeur affichée / valeurs pour le callback
-            {'label':'Auto-entrepreneurs', 'value':'auto'},
-            {'label':'Travailleurs indépendants', 'value':'independent'},],
+            {'label':'Auto-entrepreneurs', 'value':'Autoentrepreneur'},
+            {'label':'Travailleurs indépendants', 'value':'TI classique'},],
         placeholder="Type d'indépendant",
         clearable=False, # Données non supprimables
         className='dropdown-independent', # Config fichier .css
     ),
     
-    # Menu déroulant pour le ou les départements
+    # Menu déroulant pour le département
     dcc.Dropdown(
         id='departments', # pour le callback
         options=[ # valeur affichée / valeurs pour le callback
             {'label': i, 'value': i} for i in departments],
-        placeholder="Sélectionner un ou plusieurs département(s)",
-        multi=True, # Affichage de multiple départements
+        placeholder="Sélectionner un département",
+        clearable=False, # Données non supprimables
         className='dropdown-independent', # Config fichier .css
     ),
+    
 ], className='dropdowns-card') # Config fichier .css
 
 # Diagrammes
@@ -72,6 +74,7 @@ graph_card = dbc.Card([
     
     # Graphique vide pour les revenus des indépendants (diagramme linéaire)
     dcc.Graph(id='graph-revenues'), # pour le callback
+    
 ], className='graphs-card') # Config fichier .css
 
 # FRONT END ----------------------------------------------------------
@@ -105,7 +108,7 @@ app.layout = html.Div(children=[
 # INTERACTION DES COMPOSANTS -----------------------------------------
 
 # MAJ des diagrammes en fonction des valeurs sélectionnées dans les menus déroulants
-callback(
+@callback(
     [Output(
         component_id='graph-numbers', # Sortie : diagramme en barres (nbre indép.)
         component_property='figure' # Fonctionnalité : figure du graph
@@ -123,7 +126,53 @@ callback(
         component_property='value' # Fonctionnalité : valeurs du menu déroulant
     )])
 def update_graph(type_seleted, departments_selected):
-    pass
+        
+    # Si au moins une valeur est affichés aux deux menus déroulants...
+    if type_seleted and departments_selected:
+        
+        # Récupération de l'URL selon les valeurs sélectionnées 
+        # dans les menus déroulants
+        url = f"https://open.urssaf.fr/api/explore/v2.1/catalog/datasets/les-revenus-des-travailleurs-independants-par-departement/records?select=annee%2C%20nombre_de_ti%2C%20revenu&where=type_de_travailleur_independant%3D%27{type_seleted}%27%20AND%20departement%3D%22{departments_selected}%22%20AND%20annee%20%3E%20date%272012%27&order_by=annee&limit=100"
+        
+        # Requête url
+        response = requests.get(url)
+        
+        # Récupération du contenu au format json
+        data = json.loads(response.content)
+
+        # Récupération des données ci-avant converties en DF polars
+        df = pl.DataFrame(data['results'])
+        
+        # DF sur les années et le nombre d'indépendants
+        df_ti = df.select(['annee', 'nombre_de_ti'])
+        
+        # DF sur les années et les revenus des indépendants
+        df_revenues = df.select(['annee', 'revenu'])
+        
+        # Configuration du diagramme en barres (nombre d'indépendants)
+        graph_numbers = px.bar(
+            data_frame=df_ti,
+            x='annee',
+            y="nombre_de_ti",
+            height=350,
+        )
+          
+        # Configuration du diagramme linéaire (revenus des indépendants)
+        graph_revenues = px.line(
+            data_frame=df_revenues,
+            x='annee',
+            y="revenu",
+            height=350,
+        )
+        
+        # MAJ des graphiques
+        return graph_numbers, graph_revenues
+    
+    # Si dans l'un des menus déroulants, aucune valeur n'est affichée   
+    else:
+        
+        # Exception : pas de MAJ des graphiques
+        raise exceptions.PreventUpdate
 
 if __name__ == '__main__':
     app.run_server(debug=True)
