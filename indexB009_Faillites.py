@@ -14,7 +14,7 @@ Date : 10-01-24
 import requests
 import json
 import streamlit as st
-import polars as pl
+import pandas as pd
 
 
 # Présentation des données issues de l'API
@@ -68,7 +68,7 @@ class FrontEnd():
                 data = json.loads(response.content)
 
                 # Données converties en DF pandas
-                df = pl.DataFrame(data['results'])
+                df = pd.DataFrame(data['results'])
                 
                 # Renommage des champs
                 df = df.rename({"annee": "Année", 
@@ -91,14 +91,12 @@ class FrontEnd():
             st.info("Source : URSSAF - Les procédures collectives sont dénombrées par entreprise", icon="ℹ️")
             
             # Concaténation des champs Année et Trimestre
-            df = df.with_columns(pl.concat_str(
-                [pl.col('Année'), pl.lit(' - '), 
-                 pl.col('Trimestre')]).alias('Periode'))
+            df['Periode'] = df['annee'].map(str) + ' - ' +  df['trimestre'].map(str)
             
             # Graphique du nombre de sociétés concernées selon la procédure
-            st.line_chart(df, 
+            st.bar_chart(df, 
                           x='Periode', 
-                          y='Nombre de procédures', 
+                          y='nombre_de_procedures_cvs', 
                           color='#1e40d8', 
                           height=400)
             
