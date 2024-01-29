@@ -17,7 +17,7 @@ https://discuss.streamlit.io/t/formatting-numbers-with-commas-as-thousand-separa
 Dashboard :
 https://docs.google.com/drawings/d/1OKiRsCjmbV6p6VJojp3Ivz3Hvs2_cKFvSBSMGZ-Qxq0/edit
 
-Prochain travail : Insérer les graphiques
+Prochain travail : Même résultat que streamlit mais cette fois-ci avec Dash 🦹‍♂️
 
 Date : 24-01-24
 """
@@ -28,32 +28,32 @@ import pandas as pd
 
 def app():
         
+    # Récupération du fichier .csv converti en DF polars
+    job_df = pd.read_csv('data/emploi.csv', sep=";")
+    
+    # Champs à conserver
+    job_s1 = job_df[[
+        "annee", "trimestre", "region", "zone_d_emploi",
+        "effectifs_salaries_cvs", "masse_salariale_cvs"]].sort_values(
+            by=['annee', 'trimestre', 'zone_d_emploi'])
+        
+    # Filtre sur le champ 'annee'
+    job_f1 = job_s1[job_s1['annee'] > 2013]    
+    
     # Pleine page
     st.set_page_config(
         page_title="Emploi secteur privé", layout="wide") 
     
     # Titre principal de la page @
     st.markdown(
-        "<h3 style='text-align: center; color: yellow;'>Effectifs et masse salariale par zone d'emploi</h3>",
+        "<h5 style='text-align: center; color: yellow;'>Effectifs et masse salariale par zone d'emploi</h5>",
         unsafe_allow_html=True)
     
     # Configuration de la largeur des colonnes
     col1, col2 = st.columns([4, 8])
     
-    # Données à afficher dans la colonne n° 1
+    # Données à afficher dans la colonne n° 1 : menus déroulants et table
     with col1:  
-        
-        # Récupération du fichier .csv converti en DF polars
-        job_df = pd.read_csv('data/emploi.csv', sep=";")
-        
-        # Champs à conserver
-        job_s1 = job_df[[
-            "annee", "trimestre", "region", "zone_d_emploi",
-            "effectifs_salaries_cvs", "masse_salariale_cvs"]].sort_values(
-                by=['annee', 'trimestre', 'zone_d_emploi'])
-            
-        # Filtre sur le champ 'annee'
-        job_f1 = job_s1[job_s1['annee'] > 2013]
         
         # Insertion de la DF traitée ci-après dans le 1er menu déroulant
         region_st = st.selectbox(
@@ -116,6 +116,31 @@ def app():
                fit_columns_on_grid_load=True, # ajustement automatique des colonnes
                height=350, # hauteur de la table
                )
+    
+    # Données à afficher dans la colonne n° 2 : graphiques
+    with col2:
+        
+        # Concaténation des champs Année et Trimestre
+        my_df['Periode'] = (
+            my_df['annee'].map(str) + ' - ' +  my_df['trimestre'].map(str))
+        
+        # Renommage des champs
+        my_df = my_df.rename(columns={'effectifs_salaries_cvs':'Effectifs',
+                                      'masse_salariale_cvs':'Salaires'})
+
+        # Graphique sur les effectifs
+        st.line_chart(my_df, 
+                      x='Periode', 
+                      y='Effectifs', 
+                      color='#1e1ece', 
+                      height=280)
+        
+        # Graphique sur les salaires
+        st.bar_chart(my_df, 
+                      x='Periode', 
+                      y='Salaires', 
+                      color='#f22409', 
+                      height=280)
 
 # Lancement de l'application        
 app()
