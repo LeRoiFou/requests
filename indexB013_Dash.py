@@ -1,146 +1,121 @@
-"""
-Effectifs salariés et masse salariale trimestriels du secteur privé, 
-par zone d'emploi
-Lien :  https://www.data.gouv.fr/fr/datasets/effectifs-salaries-et-masse-salariale-trimestriels-du-secteur-prive-par-zone-demploi/
-
-Séries trimestrielles des effectifs salariés et de la masse salariale 
-du secteur privé, par zone d'emploi.
-
-Objet : présentation des données sous Streamlit / Dash / Power BI
-
-Dashboard :
-https://docs.google.com/drawings/d/1OKiRsCjmbV6p6VJojp3Ivz3Hvs2_cKFvSBSMGZ-Qxq0/edit
-
-Prochain travail : Même résultat que streamlit mais cette fois-ci avec Dash 🦹‍♂️
-
-Date : 31-01-24
-"""
-
-from dash import Dash, html, dcc, callback, Input, State, Output, exceptions
+from dash import Dash, html, dcc, callback, Input, Output
 import dash_bootstrap_components as dbc
-import requests
-import json
-import pandas as pd
-import plotly.express as px
+import dash_ag_grid as dag
 
-# BACK END -----------------------------------------------------------
+# BACK END ------------------------------------------------------
 
-# Récupération du fichier .csv converti en DF polars
-job_df = pd.read_csv('data/emploi.csv', sep=";")
+# CONFIGURATION DES COMPOSANTS ----------------------------------
 
-# Champs à conserver
-job_s1 = job_df[[
-    "annee", "trimestre", "region", "zone_d_emploi",
-    "effectifs_salaries_cvs", "masse_salariale_cvs"]].sort_values(
-        by=['annee', 'trimestre', 'zone_d_emploi'])
-    
-# Filtre sur le champ 'annee'
-my_df = job_s1[job_s1['annee'] > 2013]
-
-# DF sur les régions
-region_df = my_df['region'].sort_values().unique()
-
-# CONFIGURATION DES COMPOSANTS ----------------------------------------------
-
-# Carte sur les menus déroulants et la table
-dropdown_card = dbc.Card([
-    
-    # Titre rattaché au menu déroulant pour les régions
-    html.Label("Région", # Titre
-               className='label-css', # Config dans le fichier .css
-               ),
-    
-    # Menu déroulant pour les régions
+# Carte sur les menus déroulants
+card_dropdown = dbc.Card([   
+    # Menu déroulant sur les régions
     dcc.Dropdown(
-        id='id-region', # pour le callback
-        value='Grand Est', # Valeur affichée par défaut
-        options=region_df, # Valeurs insérées dans le menu déroulant
-        clearable=False, # Données non supprimables
-        style={'color':'black'}, # Couleur du texte
-        className='drop-css', # Config dans le fichier .css
+        id='drop-region-id', # pour le callback
+        options=[], # valeurs du menu déroulant
+        placeholder="Grand Est", # valeur affichée par défaut au menu
+        clearable=False, # donnée affichée non supprimables
+        style={'color': '#000000'}, # Couleur du composant
+        className='dropdown-css', # config suppl en fichier .css
         ),
     
-    html.Br(),
-    
-    # Titre rattaché au menu déroulant pour les zones d'emploi
-    html.Label("Zone d'emploi", # Titre
-               className='label-css', # Config dans le fichier .css
-               ),
-    
-    # Zone vide pour le menu déroulant pour les zones d'emploi
-    html.Div(id='id-area', # pour le callback
-             children='', # Données vides
-             )
-    
-], class_name='dropdown-card-css')
+    # Menu déroulant sur les zones d'emploi
+    dcc.Dropdown(
+        id='drop-area-id', # pour le callback
+        options=['test'], # valeurs du menu déroulant
+        placeholder="Colmar", # valeur affichée par défaut au menu
+        clearable=False, # donnée affichée non supprimable
+        style={'color': '#000000'}, # Couleur du composant
+        className='dropdown-css', # config suppl en fichier .css
+        ),
+    ], className='card-css')
 
-# FRONT END --------------------------------------------------------
+# Carte sur la table
+card_table = dbc.Card([
+    # Bouton d'export
+    html.Button(
+        "Export Excel", # Texte
+        id="button-export-id", # pour le callback
+        className='button-css', # config suppl en fichier .css
+                ),
 
-# Instanciation de la librairie Dash avec thème appliqué sur la page @
-# https://dash-bootstrap-components.opensource.faculty.ai/docs/themes/explorer/
+    # Zone vide pour la datatable
+    html.Div(
+        id="table-data-id", # pour le callback
+        children=[], # données vides
+        ),
+    ], className='card-css')
+
+# Carte pour le graphique linéaire (effectifs)
+card_line = dbc.Card([
+    
+    # Zone vide pour le graphique linéaire
+    html.Div(
+        id="line-staff-id", # pour le callback
+        children=[], # données vides
+    ),
+    ], className='card-css')
+
+# Carte pour le diagramme en barre (salaires)
+card_bar = dbc.Card([
+    
+    # Zone vide pour le diagramme en barre
+    html.Div(
+        id="bar-wages-id", # pour le callback
+        children=[], # données vides
+    ),
+    ], className='card-css')
+
+# FRONT END ----------------------------------------------------
+
+# Instanciation de la librairie Dash et mise en page @
 app = Dash(external_stylesheets=[dbc.themes.SUPERHERO])
 
 # Configuration de la page @
-app.layout = html.Div(children=[
+app.layout = html.Div([
     
-    # Titre principal de la page @
-    html.H3("Effectifs et masse salariale par zone d'emploi",
-            className='main-title'),
-    
-    # Insertion des composants configurés ci-avant
+    # Titre principal
     dbc.Row([
         
-        # Colonne sur les menus déroulants
-        dbc.Col(
-            
-            # Composants compris dans cette colonne
-            dbc.Row([
-                
-                # Carte sur les menus déroulants
-                dropdown_card,
-                
-            ]), width=3, # Largeur de la colonne
-            )
+        # Titre
+        html.H3("Effectifs et masse salariale par zone d'emploi", # texte
+                style={'textAlign': 'Center',}, # Alignement du texte à la page @
+                className='title-css', # config suppl en fichier .css
+                ),
+        
         ]),
+    
+    # Composants à afficher
+    dbc.Row([
+        
+        # Menus déroulants et table
+        dbc.Col([
+            
+            # Carte sur les menus déroulants
+            card_dropdown,
+            
+            # Table : zone vide
+            card_table,
+            
+            ], width=4 # largeur de la colonne
+                ),
+        
+        # Graphiques
+        dbc.Col([
+            
+            # Graphique sur les effectifs : zone vide
+            card_line,
+            
+            # Graphique sur les salaires : zone vide
+            card_bar,
+            
+            ], width=8 # largeur de la colonne
+                ),
+        
+    ]),
     
 ])
 
-# INTERACTION DES COMPOSANTS -------------------------------------------------
+# INTERACTION DES COMPOSANTS -----------------------------------
 
-# MAJ du menu déroulant sur les zones d'emploi en fonction de la valeur sélectionnée
-# dans le menu déroulant sur les régions
-@callback(
-    Output( # Sortie : menu déroulant sur les zones d'emploi
-        component_id='id-area', # ID 
-        component_property='value', # Fonctionnalité
-    ),
-    Input( # Entrée : menu déroulant sur les régions
-          component_id='id-region', # ID
-          component_property='value', # Fonctionnalité
-    ),
-)
-def dropdown_func(input_value):
-    
-    # DF traitée selon la région sélectionnée dans le menu déroulant sur les régions
-    area_df = region_df[region_df["region"] == input_value]
-    
-    print(area_df)
-    
-    # Données à conserver
-    area_df = area_df["zone_d_emploi"].sort_values().unique()
-    
-    # Menu déroulant pour les régions
-    area_dropdown =  dcc.Dropdown(
-        id='id-area',
-        value=area_df[0], # 1ère valeur affichée par défaut
-        options=area_df, # Valeurs insérées dans le menu déroulant
-        clearable=False, # Données non supprimables
-        style={'color':'black'}, # Couleur du texte
-        className='drop-css', # Config dans le fichier .css
-        ),
-    
-    # MAJ du menu déroulant
-    return area_dropdown
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run_server(debug=True)
